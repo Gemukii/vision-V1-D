@@ -34,6 +34,13 @@ esp_err_t app_usb_cdc_send_message(const char *message);
  */
 bool app_usb_cdc_is_ready(void);
 
+/**
+ * @brief Check if LoRaWAN device is ready (received "READY" message)
+ *
+ * @return true if LoRaWAN is ready, false otherwise
+ */
+bool app_usb_cdc_is_lora_ready(void);
+
 #ifdef __cplusplus
 }
 #endif

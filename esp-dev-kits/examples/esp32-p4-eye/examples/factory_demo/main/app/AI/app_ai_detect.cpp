@@ -44,6 +44,8 @@ static HumanFaceDetect *hum_detect = NULL;
 static COCODetect *coco_od_detect = NULL;
 
 static std::list<dl::detect::result_t> detect_results;
+static int last_face_count = -1;  // Track previous face count to avoid spam
+static TickType_t last_send_time = 0;  // Track last message send time for 10s throttling
 
 /**
  * @brief Structure for managing AI detection buffers
@@ -234,12 +236,34 @@ void camera_dectect_task(void)
             } else if (ui_extra_get_ai_detect_mode() == AI_DETECT_FACE) {
                 detect_results = app_humanface_detect((uint16_t *)p->buffer, DETECT_WIDTH, DETECT_HEIGHT);
 
-                // Send USB 2.0 message when face is detected
-                if (!detect_results.empty()) {
-                    char usb_msg[64];
-                    snprintf(usb_msg, sizeof(usb_msg), "FACE_DETECTED:%d\r\n", (int)detect_results.size());
-                    app_usb_cdc_send_message(usb_msg);
-                    ESP_LOGI(TAG, "Face detected! Count: %d", (int)detect_results.size());
+                int current_face_count = (int)detect_results.size();
+
+                // Check if LoRaWAN device is ready
+                if (app_usb_cdc_is_lora_ready()) {
+                    // Get current time
+                    TickType_t current_time = xTaskGetTickCount();
+                    TickType_t time_elapsed = current_time - last_send_time;
+
+                    // Send message if:
+                    // 1. Face count changed AND
+                    // 2. At least 10 seconds elapsed since last send (or first send)
+                    if (current_face_count != last_face_count &&
+                        (last_send_time == 0 || time_elapsed >= pdMS_TO_TICKS(10000))) {
+
+                        char usb_msg[16];
+                        snprintf(usb_msg, sizeof(usb_msg), "%d\n", current_face_count);
+                        app_usb_cdc_send_message(usb_msg);
+                        ESP_LOGI(TAG, "[USB 2.0 TX] %d (LoRaWAN)", current_face_count);
+
+                        last_face_count = current_face_count;
+                        last_send_time = current_time;
+                    }
+                } else {
+                    // Reset last_face_count when not ready so first detection is sent when ready
+                    if (last_face_count != -1) {
+                        ESP_LOGI(TAG, "Waiting for READY from LoRaWAN device...");
+                        last_face_count = -1;
+                    }
                 }
             }
 
