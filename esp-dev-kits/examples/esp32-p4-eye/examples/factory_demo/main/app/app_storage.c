@@ -46,6 +46,7 @@ static uint32_t pic_num = 0;
 static uint8_t s_pdrv = 0;
 static int s_disk_block_size = 0;
 static bool ejected[LOGICAL_DISK_NUM] = {true};
+static bool storage_initialized = false;
 
 /* Forward declarations for static functions */
 static void app_storage_find_max_pic_num(void);
@@ -731,10 +732,10 @@ static void app_storage_check_sd_card_task(void *pvParameters)
 
                 if (!usb_msc_initialized) {
                     ESP_LOGI(TAG, "USB MSC initialization");
-                    
-                    const tinyusb_config_t tusb_cfg = {0};
-                    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
-                    
+
+                    // TinyUSB driver is already installed in main.c
+                    // Just mark as initialized
+
                     usb_msc_initialized = true;
                     ESP_LOGI(TAG, "USB MSC initialization DONE");
                 } else {
@@ -821,16 +822,17 @@ static bool _logical_disk_ejected(void)
 // Invoked when device is mounted
 void tud_mount_cb(void)
 {
-    // Reset the ejection tracking every time we're plugged into USB. This allows for us to battery
-    // power the device, eject, unplug and plug it back in to get the drive.
-    for (uint8_t i = 0; i < LOGICAL_DISK_NUM; i++) {
-        ejected[i] = false;
-    }
+    // MSC is disabled - only CDC is active
+    // Do not switch to USB disk mode to avoid blocking AI detection
+    ESP_LOGI(TAG, "USB CDC mounted (MSC disabled)");
 
-    ESP_LOGI(TAG, "USB MSC mounted");
-    bsp_display_lock(0);
-    ui_extra_set_usb_disk_mounted(true);
-    bsp_display_unlock();
+    // Commented out: Do not enable USB disk mode
+    // for (uint8_t i = 0; i < LOGICAL_DISK_NUM; i++) {
+    //     ejected[i] = false;
+    // }
+    // bsp_display_lock(0);
+    // ui_extra_set_usb_disk_mounted(true);
+    // bsp_display_unlock();
 }
 
 // Invoked when device is unmounted
@@ -920,6 +922,14 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_siz
         return;
     }
 
+    // Safety check: MSC is disabled, return dummy values
+    if (!storage_initialized) {
+        *block_count = 0;
+        *block_size = 512;
+        ESP_LOGD(__func__, "Storage not initialized, returning dummy values");
+        return;
+    }
+
     disk_ioctl(s_pdrv, GET_SECTOR_COUNT, block_count);
     disk_ioctl(s_pdrv, GET_SECTOR_SIZE, block_size);
     s_disk_block_size = *block_size;
@@ -992,6 +1002,11 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void *buff
         return 0;
     }
 
+    // Safety check: return 0 if disk is not initialized
+    if (s_pdrv >= FF_VOLUMES || !ejected[lun] || s_disk_block_size == 0) {
+        return 0;
+    }
+
     const uint32_t block_count = bufsize / s_disk_block_size;
     disk_read(s_pdrv, buffer, lba, block_count);
     return block_count * s_disk_block_size;
@@ -1006,6 +1021,11 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t *
 
     if (lun >= LOGICAL_DISK_NUM) {
         ESP_LOGE(__func__, "invalid lun number %u", lun);
+        return 0;
+    }
+
+    // Safety check: return 0 if disk is not initialized
+    if (s_pdrv >= FF_VOLUMES || !ejected[lun] || s_disk_block_size == 0) {
         return 0;
     }
 

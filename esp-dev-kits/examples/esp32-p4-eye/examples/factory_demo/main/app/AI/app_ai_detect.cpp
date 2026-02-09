@@ -20,6 +20,10 @@
 
 #include "ui_extra.h"
 
+extern "C" {
+#include "app_usb_cdc.h"
+}
+
 static const char *TAG = "app_ai_detect";
 
 #define DETECT_HEIGHT    240
@@ -222,13 +226,21 @@ esp_err_t app_ai_detection_deinit(void)
 
 void camera_dectect_task(void)
 {
-    while (1) {        
+    while (1) {
         camera_pipeline_buffer_element *p = camera_pipeline_recv_element(feed_pipeline, portMAX_DELAY);
         if (p && ui_extra_get_current_page() == UI_PAGE_AI_DETECT && ui_extra_is_ui_init()) {
             if (ui_extra_get_ai_detect_mode() == AI_DETECT_PEDESTRIAN) {
                 detect_results = app_pedestrian_detect((uint16_t *)p->buffer, DETECT_WIDTH, DETECT_HEIGHT);
             } else if (ui_extra_get_ai_detect_mode() == AI_DETECT_FACE) {
                 detect_results = app_humanface_detect((uint16_t *)p->buffer, DETECT_WIDTH, DETECT_HEIGHT);
+
+                // Send USB 2.0 message when face is detected
+                if (!detect_results.empty()) {
+                    char usb_msg[64];
+                    snprintf(usb_msg, sizeof(usb_msg), "FACE_DETECTED:%d\r\n", (int)detect_results.size());
+                    app_usb_cdc_send_message(usb_msg);
+                    ESP_LOGI(TAG, "Face detected! Count: %d", (int)detect_results.size());
+                }
             }
 
             camera_pipeline_queue_element_index(feed_pipeline, p->index);

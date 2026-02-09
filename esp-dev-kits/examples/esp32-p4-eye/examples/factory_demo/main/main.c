@@ -11,6 +11,7 @@
 #include "nvs.h"
 
 #include "bsp/esp-bsp.h"
+#include "tinyusb.h"
 
 #include "ui_extra.h"
 
@@ -19,6 +20,7 @@
 #include "app_storage.h"
 #include "app_ai_detect.h"
 #include "app_qma6100.h"
+#include "app_usb_cdc.h"
 
 static const char *TAG = "main";
 
@@ -47,13 +49,26 @@ void app_main(void)
     ESP_LOGI(TAG, "Initialize the AI detect");
     ESP_ERROR_CHECK(app_ai_detect_init());
 
-    // Initialize the display
+    // Initialize the display (must be done before USB to avoid LVGL lock issues)
     ESP_LOGI(TAG, "Initialize the display");
     bsp_display_start();
 
     bsp_display_lock(0);
     ui_extra_init();
     bsp_display_unlock();
+
+    // Initialize TinyUSB driver AFTER display (to avoid LVGL lock assertion)
+    ESP_LOGI(TAG, "Initialize TinyUSB driver");
+    // Note: Custom descriptors are defined in usb_descriptors.c
+    // TinyUSB will automatically use tud_descriptor_*_cb() functions
+    const tinyusb_config_t tusb_cfg = {
+        .external_phy = false,
+    };
+    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+
+    // Initialize USB CDC for USB 2.0 port
+    ESP_LOGI(TAG, "Initialize USB CDC");
+    ESP_ERROR_CHECK(app_usb_cdc_init());
 
     // Initialize the QMA6100 IMU sensor with integrated display auto-rotation
     ESP_LOGI(TAG, "Initialize the QMA6100 IMU sensor with display auto-rotation");
