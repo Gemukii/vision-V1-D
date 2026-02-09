@@ -21,6 +21,7 @@
 #include "app_ai_detect.h"
 #include "app_qma6100.h"
 #include "app_usb_cdc.h"
+#include "app_uart_lora.h"
 
 static const char *TAG = "main";
 
@@ -69,6 +70,10 @@ void app_main(void)
     // Initialize USB CDC for USB 2.0 port
     ESP_LOGI(TAG, "Initialize USB CDC");
     ESP_ERROR_CHECK(app_usb_cdc_init());
+
+    // Initialize UART for LoRaWAN communication
+    ESP_LOGI(TAG, "Initialize UART LoRaWAN");
+    ESP_ERROR_CHECK(app_uart_lora_init());
 
     // Initialize the QMA6100 IMU sensor with integrated display auto-rotation
     ESP_LOGI(TAG, "Initialize the QMA6100 IMU sensor with display auto-rotation");

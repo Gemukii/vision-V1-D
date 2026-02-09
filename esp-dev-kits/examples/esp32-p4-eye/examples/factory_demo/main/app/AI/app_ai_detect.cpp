@@ -21,7 +21,7 @@
 #include "ui_extra.h"
 
 extern "C" {
-#include "app_usb_cdc.h"
+#include "app_uart_lora.h"
 }
 
 static const char *TAG = "app_ai_detect";
@@ -44,8 +44,9 @@ static HumanFaceDetect *hum_detect = NULL;
 static COCODetect *coco_od_detect = NULL;
 
 static std::list<dl::detect::result_t> detect_results;
-static int last_face_count = -1;  // Track previous face count to avoid spam
-static TickType_t last_send_time = 0;  // Track last message send time for 10s throttling
+static int last_sent_count = -1;  // Track last sent face count
+static int max_face_count = 0;    // Track maximum face count in 10s window
+static TickType_t last_send_time = 0;  // Track last message send time for 10s interval
 
 /**
  * @brief Structure for managing AI detection buffers
@@ -239,30 +240,45 @@ void camera_dectect_task(void)
                 int current_face_count = (int)detect_results.size();
 
                 // Check if LoRaWAN device is ready
-                if (app_usb_cdc_is_lora_ready()) {
+                if (app_uart_lora_is_ready()) {
+                    // Update max face count in current 10s window
+                    if (current_face_count > max_face_count) {
+                        max_face_count = current_face_count;
+                    }
+
                     // Get current time
                     TickType_t current_time = xTaskGetTickCount();
                     TickType_t time_elapsed = current_time - last_send_time;
 
-                    // Send message if:
-                    // 1. Face count changed AND
-                    // 2. At least 10 seconds elapsed since last send (or first send)
-                    if (current_face_count != last_face_count &&
-                        (last_send_time == 0 || time_elapsed >= pdMS_TO_TICKS(10000))) {
+                    // Send message every 10 seconds with MAX face count in the window
+                    if (last_send_time == 0 || time_elapsed >= pdMS_TO_TICKS(10000)) {
 
-                        char usb_msg[16];
-                        snprintf(usb_msg, sizeof(usb_msg), "%d\n", current_face_count);
-                        app_usb_cdc_send_message(usb_msg);
-                        ESP_LOGI(TAG, "[USB 2.0 TX] %d (LoRaWAN)", current_face_count);
+                        // Exception: if max is 0 and we already sent 0, don't send again
+                        bool should_send = true;
+                        if (max_face_count == 0 && last_sent_count == 0) {
+                            should_send = false;
+                        }
 
-                        last_face_count = current_face_count;
-                        last_send_time = current_time;
+                        if (should_send) {
+                            char uart_msg[16];
+                            snprintf(uart_msg, sizeof(uart_msg), "%d\n", max_face_count);
+                            app_uart_lora_send_message(uart_msg);
+                            ESP_LOGI(TAG, "[UART TX] %d (LoRaWAN, max in 10s)", max_face_count);
+
+                            last_sent_count = max_face_count;
+                            last_send_time = current_time;
+                        }
+
+                        // Reset max count for next 10s window
+                        max_face_count = current_face_count;
                     }
                 } else {
-                    // Reset last_face_count when not ready so first detection is sent when ready
-                    if (last_face_count != -1) {
+                    // Reset when not ready so first detection is sent when ready
+                    if (last_sent_count != -1) {
                         ESP_LOGI(TAG, "Waiting for READY from LoRaWAN device...");
-                        last_face_count = -1;
+                        last_sent_count = -1;
+                        max_face_count = 0;
+                        last_send_time = 0;
                     }
                 }
             }
