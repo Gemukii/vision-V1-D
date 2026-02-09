@@ -1,0 +1,43 @@
+{
+	"id": null,
+	"uid": "v1d-ttn",
+	"title": "V1-D TTN Overview",
+	"timezone": "browser",
+	"schemaVersion": 39,
+	"version": 1,
+	"refresh": "10s",
+	"time": {
+		"from": "now-6h",
+		"to": "now"
+	},
+	"panels": [
+		{
+			"id": 1,
+			"title": "Uplink count (1h)",
+			"type": "stat",
+			"datasource": {
+				"type": "influxdb",
+				"uid": "influxdb-ttn"
+			},
+			"targets": [
+				{
+					"refId": "A",
+					"queryType": "flux",
+					"query": "from(bucket: \"${INFLUXDB_BUCKET}\")\\n  |> range(start: -1h)\\n  |> filter(fn: (r) => r._measurement == \"ttn_uplink\")\\n  |> count()"
+				}
+			],
+			"options": {
+				"reduceOptions": {
+					"calcs": ["last"],
+					"fields": "",
+					"values": false
+				},
+				"orientation": "horizontal",
+				"textMode": "auto",
+				"colorMode": "value",
+				"graphMode": "none",
+				"justifyMode": "auto"
+			}
+		}
+	]
+}
