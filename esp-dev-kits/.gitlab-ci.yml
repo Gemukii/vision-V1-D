@@ -1,0 +1,48 @@
+stages:
+  - pre_check
+  - build
+  - build_doc
+  - deploy
+
+workflow:
+  rules:
+    # Disable those non-protected push triggered pipelines
+    - if: '$CI_COMMIT_REF_NAME != "master" && $CI_COMMIT_BRANCH !~ /^release\/v/ && $CI_COMMIT_TAG !~ /^v\d+\.\d+(\.\d+)?($|-)/ && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    # when running merged result pipelines, it would create a temp commit id. use $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA instead of $CI_COMMIT_SHA.
+    # Please use PIPELINE_COMMIT_SHA at all places that require a commit sha
+    - if: $CI_OPEN_MERGE_REQUESTS != null
+      variables:
+        PIPELINE_COMMIT_SHA: $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA
+    - if: $CI_OPEN_MERGE_REQUESTS == null
+      variables:
+        PIPELINE_COMMIT_SHA: $CI_COMMIT_SHA
+    - when: always
+
+variables:
+  PYTHON_VER: 3.6.13
+  BATCH_BUILD: "1"
+  V: "0"
+  IDF_CI_BUILD: "1"
+  DEV_KITS_PATH: "$CI_PROJECT_DIR"
+
+before_script:
+  # add gitlab ssh key
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
+  - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
+  - chmod 600 ~/.ssh/id_rsa
+  - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - git --version
+  - git submodule update --init --recursive --force
+  - export LC_ALL="C.UTF-8" # Add UTF-8 support
+
+include:
+  - '.gitlab/ci/pre_check.yml'
+  - '.gitlab/ci/pre_commit.yml'
+  - '.gitlab/ci/build.yml'
+  - '.gitlab/ci/docs.yml'
+  - '.gitlab/ci/deploy.yml'
+  - '.gitlab/ci/rules.yml'
+  - '.gitlab/ci/publish_docs_to_cdp.yml'
