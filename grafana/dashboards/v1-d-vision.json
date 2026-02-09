@@ -1,43 +1,128 @@
 {
-	"id": null,
-	"uid": "v1d-ttn",
-	"title": "V1-D TTN Overview",
-	"timezone": "browser",
-	"schemaVersion": 39,
-	"version": 1,
-	"refresh": "10s",
-	"time": {
-		"from": "now-6h",
-		"to": "now"
-	},
-	"panels": [
-		{
-			"id": 1,
-			"title": "Uplink count (1h)",
-			"type": "stat",
-			"datasource": {
-				"type": "influxdb",
-				"uid": "influxdb-ttn"
-			},
-			"targets": [
-				{
-					"refId": "A",
-					"queryType": "flux",
-					"query": "from(bucket: \"${INFLUXDB_BUCKET}\")\\n  |> range(start: -1h)\\n  |> filter(fn: (r) => r._measurement == \"ttn_uplink\")\\n  |> count()"
-				}
-			],
-			"options": {
-				"reduceOptions": {
-					"calcs": ["last"],
-					"fields": "",
-					"values": false
-				},
-				"orientation": "horizontal",
-				"textMode": "auto",
-				"colorMode": "value",
-				"graphMode": "none",
-				"justifyMode": "auto"
-			}
-		}
-	]
+  "id": null,
+  "uid": "v1-d-vision",
+  "title": "IoT LoRaWAN - Supervision",
+  "tags": ["iot", "lorawan", "ttn"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 0,
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Événements (24h)",
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> count()"
+      }],
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Température (°C)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"temperature\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius"
+        }
+      },
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Humidité (%)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"humidity\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Dernier événement (âge)",
+      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: -7d)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> last()\n  |> map(fn: (r) => ({ r with _value: float(v: now() - r._time) / 1000000.0 }))"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurationms"
+        }
+      },
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Confiance moyenne (1h)",
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> mean()"
+      }],
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Événements par type (1h)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"event_type\")\n  |> map(fn: (r) => ({ r with event_type: string(v: r._value), _value: 1.0 }))\n  |> group(columns: [\"event_type\"])\n  |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)"
+      }],
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Confiance (moyenne 5 min)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> filter(fn: (r) => r[\"_field\"] == \"confidence\")\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)"
+      }],
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Derniers événements",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"},
+        "query": "from(bucket: \"tasks\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ttn_uplink\")\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> keep(columns: [\"device_id\", \"event_type\", \"confidence\", \"lux\", \"_time\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 20)"
+      }],
+      "datasource": {"type": "influxdb", "uid": "${DS_INFLUXDB}"}
+    }
+  ],
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "refresh": "30s"
 }
