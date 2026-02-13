@@ -17,8 +17,8 @@ static const char *TAG = "app_uart_lora";
 // UART configuration
 #define UART_PORT_NUM      UART_NUM_1
 #define UART_BAUD_RATE     9600
-#define UART_TX_PIN        50
-#define UART_RX_PIN        52
+#define UART_TX_PIN        6
+#define UART_RX_PIN        7
 #define UART_BUF_SIZE      1024
 
 static bool s_uart_initialized = false;
@@ -69,38 +69,29 @@ esp_err_t app_uart_lora_init(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    // Install UART driver
-    esp_err_t ret = uart_driver_install(UART_PORT_NUM, UART_BUF_SIZE, UART_BUF_SIZE, 0, NULL, 0);
+    // Configure UART parameters first
+    esp_err_t ret = uart_param_config(UART_PORT_NUM, &uart_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure UART parameters: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Set UART pins before installing driver
+    ret = uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set UART pins: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // Install UART driver last
+    ret = uart_driver_install(UART_PORT_NUM, UART_BUF_SIZE, UART_BUF_SIZE, 0, NULL, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install UART driver: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    // Configure UART parameters
-    ret = uart_param_config(UART_PORT_NUM, &uart_config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure UART parameters: %s", esp_err_to_name(ret));
-        uart_driver_delete(UART_PORT_NUM);
-        return ret;
-    }
-
-    // Set UART pins
-    ret = uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set UART pins: %s", esp_err_to_name(ret));
-        uart_driver_delete(UART_PORT_NUM);
-        return ret;
-    }
-
     s_uart_initialized = true;
     ESP_LOGI(TAG, "UART initialized successfully");
-
-    // Send test message to verify TX is working on GPIO50
-    const char *test_msg = "ESP32_TEST\n";
-    int test_len = strlen(test_msg);
-    int written = uart_write_bytes(UART_PORT_NUM, test_msg, test_len);
-    uart_wait_tx_done(UART_PORT_NUM, pdMS_TO_TICKS(1000));
-    ESP_LOGI(TAG, "Sent test message on GPIO50 TX: %s (written=%d bytes)", test_msg, written);
 
     // Start UART RX task to receive "READY" from LoRaWAN device
     xTaskCreatePinnedToCore(
