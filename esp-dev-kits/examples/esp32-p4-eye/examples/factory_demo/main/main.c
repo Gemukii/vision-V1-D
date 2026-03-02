@@ -22,6 +22,7 @@
 #include "app_qma6100.h"
 #include "app_usb_cdc.h"
 #include "app_uart_lora.h"
+#include "app_gpio_c6.h"
 
 static const char *TAG = "main";
 
@@ -74,6 +75,10 @@ void app_main(void)
     // Initialize UART for LoRaWAN communication
     ESP_LOGI(TAG, "Initialize UART LoRaWAN");
     ESP_ERROR_CHECK(app_uart_lora_init());
+
+    // Initialize GPIO communication with ESP32-C6
+    ESP_LOGI(TAG, "Initialize GPIO C6 communication");
+    ESP_ERROR_CHECK(app_gpio_c6_init());
 
     // Initialize the QMA6100 IMU sensor with integrated display auto-rotation
     ESP_LOGI(TAG, "Initialize the QMA6100 IMU sensor with display auto-rotation");

@@ -62,7 +62,7 @@ esp_err_t app_humanface_ai_detect(uint16_t *detect_buf, uint16_t *draw_buf, int 
 
 /**
  * @brief Detect pedestrians in input frame and draw results on output buffer
- * 
+ *
  * @param detect_buf Input buffer containing the frame
  * @param draw_buf Output buffer to draw detection results
  * @param width Frame width
@@ -70,6 +70,13 @@ esp_err_t app_humanface_ai_detect(uint16_t *detect_buf, uint16_t *draw_buf, int 
  * @return ESP_OK on success, error code otherwise
  */
 esp_err_t app_pedestrian_ai_detect(uint16_t *detect_buf, uint16_t *draw_buf, int width, int height);
+
+/**
+ * @brief Get current number of detected faces
+ *
+ * @return Number of faces currently detected (0 if none or if not in face detection mode)
+ */
+int app_ai_get_current_face_count(void);
 
 #ifdef __cplusplus
 }

@@ -93,11 +93,12 @@ std::list<dl::detect::result_t> &MNP::run(const dl::image::img_t &img, std::list
     }
     m_postprocessor->nms();
     std::list<dl::detect::result_t> &result = m_postprocessor->get_result(img.width, img.height);
-    if (candidates.size() > 0) {
-        latency[0].print("detect", "preprocess");
-        latency[1].print("detect", "forward");
-        latency[2].print("detect", "postprocess");
-    }
+    // Commented out latency logs to reduce spam
+    // if (candidates.size() > 0) {
+    //     latency[0].print("detect", "preprocess");
+    //     latency[1].print("detect", "forward");
+    //     latency[2].print("detect", "postprocess");
+    // }
     return result;
 }
 

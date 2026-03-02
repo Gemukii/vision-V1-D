@@ -1,0 +1,6 @@
+# Console sur UART0 (libere USB-Serial-JTAG pour le bridge)
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+# IMPORTANT: desactiver le secondary console qui ecrit aussi sur USB-JTAG
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+# Reduire les logs bootloader
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y

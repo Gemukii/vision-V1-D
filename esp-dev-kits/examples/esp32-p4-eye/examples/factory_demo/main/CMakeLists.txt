@@ -3,6 +3,9 @@ set(APP_DIR app)
 # Collect app core source files
 file(GLOB APP_CORE_C_SOURCES ${APP_DIR}/*.c)
 
+# Explicitly add app_gpio_c6.c to ensure it's compiled
+list(APPEND APP_CORE_C_SOURCES ${APP_DIR}/app_gpio_c6.c)
+
 # Collect AI module source files
 file(GLOB APP_AI_CPP_SOURCES ${APP_DIR}/AI/*.cpp)
 file(GLOB APP_AI_C_SOURCES ${APP_DIR}/AI/*.c)

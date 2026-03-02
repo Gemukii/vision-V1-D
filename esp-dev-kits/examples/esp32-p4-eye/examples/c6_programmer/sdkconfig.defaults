@@ -1,0 +1,7 @@
+# Console sur USB-Serial-JTAG (UART0 par défaut pour C6)
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_NUM=0
+
+# Désactiver les logs bootloader pour ne pas polluer
+CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y
+CONFIG_LOG_DEFAULT_LEVEL_NONE=y

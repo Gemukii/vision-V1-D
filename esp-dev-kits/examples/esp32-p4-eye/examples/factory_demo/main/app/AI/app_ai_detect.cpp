@@ -47,6 +47,9 @@ static std::list<dl::detect::result_t> detect_results;
 static int last_sent_count = -1;  // Track last sent face count
 static int max_face_count = 0;    // Track maximum face count in 10s window
 static TickType_t last_send_time = 0;  // Track last message send time for 10s interval
+static int current_face_count_global = 0;  // Current number of faces detected
+static bool face_mode_init_sent = false;  // Track if initial 0;0 message sent for Face mode
+static int last_logged_face_count = -1;  // Track last logged face count to avoid spam
 
 /**
  * @brief Structure for managing AI detection buffers
@@ -238,49 +241,15 @@ void camera_dectect_task(void)
                 detect_results = app_humanface_detect((uint16_t *)p->buffer, DETECT_WIDTH, DETECT_HEIGHT);
 
                 int current_face_count = (int)detect_results.size();
+                current_face_count_global = current_face_count;  // Update global count for C6 access
 
-                // Check if LoRaWAN device is ready
-                if (app_uart_lora_is_ready()) {
-                    // Update max face count in current 10s window
-                    if (current_face_count > max_face_count) {
-                        max_face_count = current_face_count;
-                    }
-
-                    // Get current time
-                    TickType_t current_time = xTaskGetTickCount();
-                    TickType_t time_elapsed = current_time - last_send_time;
-
-                    // Send message every 10 seconds with MAX face count in the window
-                    if (last_send_time == 0 || time_elapsed >= pdMS_TO_TICKS(10000)) {
-
-                        // Exception: if max is 0 and we already sent 0, don't send again
-                        bool should_send = true;
-                        if (max_face_count == 0 && last_sent_count == 0) {
-                            should_send = false;
-                        }
-
-                        if (should_send) {
-                            char uart_msg[16];
-                            snprintf(uart_msg, sizeof(uart_msg), "%d\n", max_face_count);
-                            app_uart_lora_send_message(uart_msg);
-                            ESP_LOGI(TAG, "[UART TX] %d (LoRaWAN, max in 10s)", max_face_count);
-
-                            last_sent_count = max_face_count;
-                            last_send_time = current_time;
-                        }
-
-                        // Reset max count for next 10s window
-                        max_face_count = current_face_count;
-                    }
-                } else {
-                    // Reset when not ready so first detection is sent when ready
-                    if (last_sent_count != -1) {
-                        ESP_LOGI(TAG, "Waiting for READY from LoRaWAN device...");
-                        last_sent_count = -1;
-                        max_face_count = 0;
-                        last_send_time = 0;
-                    }
+                // Log face count only when it changes
+                if (current_face_count != last_logged_face_count) {
+                    ESP_LOGI(TAG, "Faces detected: %d", current_face_count);
+                    last_logged_face_count = current_face_count;
                 }
+
+                // No automatic LoRaWAN messages - only send when C6 triggers GRANTED/DENIED
             }
 
             camera_pipeline_queue_element_index(feed_pipeline, p->index);
@@ -415,4 +384,9 @@ esp_err_t app_pedestrian_ai_detect(uint16_t *detect_buf, uint16_t *draw_buf, int
     }
 
     return ESP_OK;
+}
+
+extern "C" int app_ai_get_current_face_count(void)
+{
+    return current_face_count_global;
 }
